@@ -19,13 +19,35 @@ import numpy as np
 import matplotlib.pyplot as plt
 import cv2
 from cv2 import aruco
+import pandas as pd
+
+
+def load_world_file(image_name):
+    # world_name = os.path.splitext(os.path.basename(image_name))[0] + ".pgw"
+    world_name = os.path.splitext(image_name)[0] + ".pgw"
+    with open(world_name, "r") as world_f:
+        lines = world_f.readlines()
+    gsd = float(lines[0])
+    UL_X = float(lines[4])
+    UL_Y = float(lines[5])
+
+    return gsd, UL_X, UL_Y
+
+
+def compute_geocoords(pix_x, pix_y, gsd, UL_X, UL_Y):
+    x_m = UL_X + pix_x * gsd
+    y_m = UL_Y - pix_y * gsd
+
+    return x_m, y_m
 
 
 class GcpFind():
     """ class to collect GCPs on an image """
     LUT_IN = [0, 158, 216, 255]
     LUT_OUT = [0, 22, 80, 176]
-
+    coords_by_gcp = []
+    accuracy_by_gcp = []
+    threshold = 10  # m
 
 
     def __init__(self, args, params, parser):
@@ -164,7 +186,11 @@ class GcpFind():
 
             :param image_name: path to image to process
         """
+        # https://jangjy.tistory.com/337
         frame = cv2.imread(image_name)
+        if frame is None:
+            n = np.fromfile(image_name, dtype=np.uint8)
+            frame = cv2.imdecode(n, cv2.IMREAD_COLOR)
         if frame is None:
             print('error reading image: {}'.format(image_name))
             return
@@ -220,9 +246,18 @@ class GcpFind():
                     print("No coordinates for {}".format(j))
             else:
                 if j in self.coords:
-                    self.foutput.write('{:.3f} {:.3f} {:.3f} {} {} {} {}\n'.format(
+                    ####################################################################################
+                    # Compute coordinates of detected GCP
+                    gsd, UL_X, UL_Y = load_world_file(image_name)
+                    x_m, y_m = compute_geocoords(x, y, gsd, UL_X, UL_Y)
+                    diff = np.array([self.coords[j][0], self.coords[j][1]]) - np.array([x_m, y_m])
+                    error = np.sqrt(np.sum(np.square(diff), axis=0))
+                    self.foutput.write('{:.3f} {:.3f} {:.3f} {} {} {} {} {:.3f} {:.3f} {:.3f}\n'.format(
                         self.coords[j][0], self.coords[j][1], self.coords[j][2],
-                        x, y, os.path.basename(image_name), j))
+                        x, y, os.path.basename(image_name), j, x_m, y_m, error))
+                    if error < self.threshold:
+                        self.coords_by_gcp.append([j, os.path.basename(image_name), x_m, y_m, diff[0], diff[1], error])
+                    ####################################################################################
                 else:
                     self.foutput.write('{} {} {} {}\n'.format(x, y,
                                                               os.path.basename(image_name), j))
@@ -240,6 +275,33 @@ class GcpFind():
         if args.debug:
             #plt.legend()
             plt.show()
+
+    def compute_accuracy(self):
+        df = pd.DataFrame(self.coords_by_gcp, columns=['GCP', 'Image', 'X_ext', 'Y_ext', 'X_diff', 'Y_diff', 'RMSE'])
+        print(df)
+        df.to_csv("coords_by_gcp.txt", float_format="%.3f", index=False)
+
+        for k, v in df.groupby(["GCP"]).indices.items():
+            rows = df.loc[v]
+
+            gcp = np.average(rows.GCP.values)
+            X_ext = np.average(rows.X_ext.values)
+            Y_ext = np.average(rows.Y_ext.values)
+
+            computed = np.array([X_ext, Y_ext])
+            surveyed = np.array(self.coords[k][0:2])
+            diff = surveyed - computed
+            rmse = np.sqrt(np.sum(np.square(diff), axis=0))
+
+            # self.accuracy_by_gcp = [GCP, X (m), Y (m), X_diff (m), Y_diff (m), RMSE (m)]
+            self.accuracy_by_gcp.append([int(k), X_ext, Y_ext, diff[0], diff[1], rmse])
+
+        accuracy_df = pd.DataFrame(self.accuracy_by_gcp)
+        accuracy_df.columns = ['GCP', 'X_ext', 'Y_ext', 'X_diff', 'Y_diff', 'RMSE']
+        print(accuracy_df)
+        accuracy_df.to_csv("accuracy_by_gcp.txt", float_format="%.3f", index=False)
+
+
 
 
 def cmd_params(parser, params):
@@ -425,5 +487,6 @@ if __name__ == "__main__":
     args.names = images_path    # for multiple images
     gcps = GcpFind(args, params, parser)
     gcps.process_images()
+    gcps.compute_accuracy()     # computing accuracy of gcps
     T2 = time.perf_counter()
     print(f'Finished in {T2-T1} seconds')
