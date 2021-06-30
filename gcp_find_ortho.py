@@ -301,6 +301,9 @@ class GcpFind():
         print(accuracy_df)
         accuracy_df.to_csv("accuracy_by_gcp.txt", float_format="%.3f", index=False)
 
+        detected_images = list(df.groupby(["Image"]).indices)
+        return detected_images
+
 
 
 
@@ -475,6 +478,23 @@ def set_images_path(arguments):
 
     return images_path
 
+
+def set_images_path_rest(arguments, detected_images):
+    images_path = []
+    extensions = [".JPG", ".jpg", ".PNG", ".png"]
+    folder = os.path.dirname(arguments.names[0])
+
+    for root, dirs, files in os.walk(folder):
+        for file in files:
+            filename = os.path.splitext(file)[0]
+            extension = os.path.splitext(file)[1]
+            if extension in extensions and os.path.basename(file) not in det_images:
+                image_path = root + os.sep + file
+                images_path.append(image_path)
+
+    return images_path
+
+
 if __name__ == "__main__":
     T1 = time.perf_counter()
     # set up command line argument parser
@@ -487,6 +507,10 @@ if __name__ == "__main__":
     args.names = images_path    # for multiple images
     gcps = GcpFind(args, params, parser)
     gcps.process_images()
-    gcps.compute_accuracy()     # computing accuracy of gcps
+    det_images = gcps.compute_accuracy()     # computing accuracy of gcps & return detected images(list)
+
+    rest_images = set_images_path_rest(args, det_images)
+    # TODO: Sharpen images
+
     T2 = time.perf_counter()
     print(f'Finished in {T2-T1} seconds')
