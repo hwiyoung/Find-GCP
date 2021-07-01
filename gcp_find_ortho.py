@@ -187,10 +187,8 @@ class GcpFind():
             :param image_name: path to image to process
         """
         # https://jangjy.tistory.com/337
-        frame = cv2.imread(image_name)
-        if frame is None:
-            n = np.fromfile(image_name, dtype=np.uint8)
-            frame = cv2.imdecode(n, cv2.IMREAD_COLOR)
+        n = np.fromfile(image_name, dtype=np.uint8)
+        frame = cv2.imdecode(n, cv2.IMREAD_COLOR)
         if frame is None:
             print('error reading image: {}'.format(image_name))
             return
@@ -280,6 +278,35 @@ class GcpFind():
         df = pd.DataFrame(self.coords_by_gcp, columns=['GCP', 'Image', 'X_ext', 'Y_ext', 'X_diff', 'Y_diff', 'RMSE'])
         print(df)
         df.to_csv("coords_by_gcp.txt", float_format="%.3f", index=False)
+
+        ################################################################
+        # Write csv to geojson
+        print("Writing csv to geojson...")
+        import csv, json
+        from geojson import Feature, FeatureCollection, Point
+
+        features = []
+        with open('coords_by_gcp.txt', newline='') as csvfile:
+            reader = csv.reader(csvfile, delimiter=',')
+            for GCP, Image, X_est, Y_est, X_diff, Y_diff, RMSE in reader:
+                if not GCP == "GCP":
+                    X_est, Y_est = map(float, (X_est, Y_est))
+                    features.append(
+                        Feature(
+                            geometry=Point((X_est, Y_est)),
+                            properties={
+                                'Image': os.path.splitext(Image)[0],
+                                'GCP': int(GCP)
+                            }
+                        )
+                    )
+
+        crs = {"type": "name", "properties": {"name": "urn:ogc:def:crs:EPSG::5186"}}
+        collection = FeatureCollection(features, crs=crs)
+        with open("computed_gp.geojson", "w") as f:
+            f.write('%s' % collection)
+        print("Writing Finished!!!")
+        ################################################################
 
         for k, v in df.groupby(["GCP"]).indices.items():
             rows = df.loc[v]
