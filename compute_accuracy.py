@@ -80,6 +80,8 @@ def absolute_accuracy(computed, survyed, by_gcp=True):
     print(f" * Total RMSE: {total_rmse_abs_whole:.2f} m")
     stats_abs_whole_df.to_csv("coords_accuracy/absolute_whole.csv")
 
+    return stats_abs_whole_df, total_rmse_abs_whole
+
 
 def relative_accuracy(computed, by_gcp=True):
     print("\n*********************\n  Relative accuracy   \n*********************")
@@ -132,15 +134,26 @@ def relative_accuracy(computed, by_gcp=True):
     print(f" * Total RMSE: {total_rmse_rel_whole:.2f} m")
     stats_rel_whole_df.to_csv("coords_accuracy/relative_whole.csv")
 
+    return stats_rel_whole_df, total_rmse_rel_whole
+
 
 if __name__ == "__main__":
     # pd.set_option('display.max_columns', None)
     pd.options.display.float_format = "{:,.2f}".format
 
-    computed_fname = "coords_accuracy/computed_gp.geojson"  # geojson
+    computed_fname = "coords_accuracy/computed_gp_04.geojson"  # geojson
     surveyed_fname = "모슬포_GCP.csv"                        # csv
 
     computed_points, surveyed_points = read_points(computed_fname, surveyed_fname)
-    absolute_accuracy(computed_points, surveyed_points, by_gcp=False)
-    relative_accuracy(computed_points, by_gcp=False)
+    stats_abs_whole_df, total_rmse_abs_whole = absolute_accuracy(computed_points, surveyed_points, by_gcp=False)
+    stats_rel_whole_df, total_rmse_rel_whole = relative_accuracy(computed_points, by_gcp=False)
+
+    stats_abs_whole_df["XY_abs"] = [0, 0, 0, 0, total_rmse_abs_whole]
+    stats_rel_whole_df["XY_rel"] = [0, 0, 0, 0, total_rmse_rel_whole]
+    stats_abs_rel = pd.concat([stats_abs_whole_df, stats_rel_whole_df], axis=1)
+    stats_abs_rel.columns = ["X_abs", "Y_abs", "XY_abs", "X_rel", "Y_rel", "XY_rel"]
+    print(f"\n{len(computed_points)} markers, unit: m\n", stats_abs_rel)
+    stats_abs_rel.to_csv("coords_accuracy/accuracy.csv")
+
+    print("Done")
 
