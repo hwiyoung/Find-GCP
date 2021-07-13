@@ -22,6 +22,7 @@ from cv2 import aruco
 import pandas as pd
 
 
+
 def load_world_file(image_name):
     # world_name = os.path.splitext(os.path.basename(image_name))[0] + ".pgw"
     world_name = os.path.splitext(image_name)[0] + ".pgw"
@@ -274,7 +275,7 @@ class GcpFind():
             #plt.legend()
             plt.show()
 
-    def compute_accuracy(self):
+    def coords_accuracy(self):
         df = pd.DataFrame(self.coords_by_gcp, columns=['GCP', 'Image', 'X_ext', 'Y_ext', 'X_diff', 'Y_diff', 'RMSE'])
         print(df)
         df.to_csv("coords_by_gcp.txt", float_format="%.3f", index=False)
@@ -303,7 +304,7 @@ class GcpFind():
 
         crs = {"type": "name", "properties": {"name": "urn:ogc:def:crs:EPSG::5186"}}
         collection = FeatureCollection(features, crs=crs)
-        with open("computed_gp.geojson", "w") as f:
+        with open("coords_accuracy/computed_gp.geojson", "w") as f:
             f.write('%s' % collection)
         print("Writing Finished!!!")
         ################################################################
@@ -327,11 +328,6 @@ class GcpFind():
         accuracy_df.columns = ['GCP', 'X_ext', 'Y_ext', 'X_diff', 'Y_diff', 'RMSE']
         print(accuracy_df)
         accuracy_df.to_csv("accuracy_by_gcp.txt", float_format="%.3f", index=False)
-
-        detected_images = list(df.groupby(["Image"]).indices)
-        return detected_images
-
-
 
 
 def cmd_params(parser, params):
@@ -506,38 +502,22 @@ def set_images_path(arguments):
     return images_path
 
 
-def set_images_path_rest(arguments, detected_images):
-    images_path = []
-    extensions = [".JPG", ".jpg", ".PNG", ".png"]
-    folder = os.path.dirname(arguments.names[0])
-
-    for root, dirs, files in os.walk(folder):
-        for file in files:
-            filename = os.path.splitext(file)[0]
-            extension = os.path.splitext(file)[1]
-            if extension in extensions and os.path.basename(file) not in det_images:
-                image_path = root + os.sep + file
-                images_path.append(image_path)
-
-    return images_path
-
-
 if __name__ == "__main__":
     T1 = time.perf_counter()
     # set up command line argument parser
     params = aruco.DetectorParameters_create()
     parser = argparse.ArgumentParser()
     cmd_params(parser, params)
-    # parse command line arguments
-    args = parser.parse_args()
+    args = parser.parse_args()  # parse command line arguments
     images_path = set_images_path(args)
     args.names = images_path    # for multiple images
+
+    # Process
     gcps = GcpFind(args, params, parser)
     gcps.process_images()
-    det_images = gcps.compute_accuracy()     # computing accuracy of gcps & return detected images(list)
 
-    rest_images = set_images_path_rest(args, det_images)
-    # TODO: Sharpen images
+    # Compute accuracy
+    gcps.coords_accuracy()     # coordinates & accuracy of gcps (txt & geojson)
 
     T2 = time.perf_counter()
     print(f'Finished in {T2-T1} seconds')
