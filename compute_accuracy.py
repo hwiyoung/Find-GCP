@@ -141,8 +141,13 @@ if __name__ == "__main__":
     # pd.set_option('display.max_columns', None)
     pd.options.display.float_format = "{:,.2f}".format
 
-    computed_fname = "coords_accuracy/computed_gp_04.geojson"  # geojson
-    surveyed_fname = "모슬포_GCP.csv"                        # csv
+    computed_fname = "coords_accuracy/computed_gp_04_DG.geojson"  # geojson
+    # computed_fname = "coords_accuracy/computed_gp_04_LBA.geojson"  # geojson
+    surveyed_fname = "모슬포_GCP.csv"  # csv
+
+    # computed_fname = "coords_accuracy/computed_gp_06_DG.geojson"  # geojson
+    # computed_fname = "coords_accuracy/computed_gp_06_LBA.geojson"  # geojson
+    # surveyed_fname = "운진항_GCP.csv"                        # csv
 
     computed_points, surveyed_points = read_points(computed_fname, surveyed_fname)
     stats_abs_whole_df, total_rmse_abs_whole = absolute_accuracy(computed_points, surveyed_points, by_gcp=False)

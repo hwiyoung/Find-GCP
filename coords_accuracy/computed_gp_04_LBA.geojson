@@ -1,6 +1,6 @@
 {
 "type": "FeatureCollection",
-"name": "computed_gp_04",
+"name": "computed_gp_04_LBA",
 "crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:EPSG::5186" } },
 "features": [
 { "type": "Feature", "properties": { "GCP": 6, "Image": "DJI_0168" }, "geometry": { "type": "Point", "coordinates": [ 130343.296, 69284.504 ] } },
